@@ -1,0 +1,320 @@
+---
+title: "BST63 HW4"
+author: "Jiangshan Zhang"
+date: "Feb 23, 2018"
+fontsize: 12pt
+output:
+  html_document: default
+  pdf_document: default
+header-includes:
+  - \parindent 2 em
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##2.
+
+```{r 2, echo=TRUE}
+LDApara<-function(X,Y,K) {
+  ##calculate pik and muk
+  pik=rep(0,K)
+  muk=matrix(rep(1,ncol(X)*K),nrow=K,ncol=ncol(X))
+  for (i in 1:K) {
+    pik[i]=length(Y[Y==i])/length(Y)
+    muk[i,]=colMeans(X[Y==i,])
+  }
+  #calculate covariance matrix
+  c=matrix(rep(0),nrow=ncol(X),ncol=ncol(X))
+  for (i in 1:K) {
+    ck=t(X[Y==i,]-matrix(rep(muk[i,],nrow(X[Y==i,])),nrow =nrow(X[Y==i,]),ncol=length(muk[i,]),byrow = TRUE)) %*%(X[Y==i,]-matrix(rep(muk[i,],nrow(X[Y==i,])),nrow =nrow(X[Y==i,]),ncol=length(muk[i,]),byrow = TRUE))
+    c=c+ck
+    
+  }
+  C=c/length(Y)
+  #calculate a
+  a=rep(1,K)
+  b=matrix(rep(1,ncol(X)*K),nrow = ncol(X),ncol=K)
+  a=diag(log(pik)-1/2*(muk)%*%chol2inv(chol(C))%*%t(muk))
+  b=chol2inv(chol(C))%*%t(muk)
+  
+  return(list(a=a,b=b))
+}
+```
+
+
+##3
+```{r 3, echo=TRUE}
+LDA<-function(a,b,x0) {
+  y_hat=rep(0,nrow(x0))
+  for (j in 1:nrow(x0)){
+    value=rep(1,length(a))
+    for (i in 1:length(a)){
+      value[i]=a[i]+(x0[j,])%*%b[,i]
+    }
+    y_hat[j]=which.max(value)
+  }
+ 
+  return (y_hat)
+}
+
+```
+
+##4
+```{r 4, echo=TRUE}
+set.seed(1)  # reset the random number generator
+d = 2  # dimension of each training point x_i
+n = 100  # number of training samples to simulate
+n_test = 10000  # number of test samples to simulate
+f = function(x0) { (x0[1]>0)+(x0[2]>0)+1 }  # true relationship between x's and y's
+x = matrix(rnorm(n*d),d,n)  # simulate matrix of training x's
+y = apply(x,2,f)  # simulate training y's with no noise
+x_test = matrix(rnorm(n_test*d),d,n_test)  # simulate test x's
+y_test = apply(x_test,2,f)  # simulate test y's
+plot(x_test[1,1:100],x_test[2,1:100],col=y_test+1,pch=19,main='test data distribution as dim=2')
+```
+```{r 41, echo=TRUE}
+para<-LDApara(X=t(x),Y=y,K=3)
+y_pred<-LDA(a=para$a,b=para$b,x0=t(x))
+train_error = mean(y_pred != y)
+y_test_pred<-LDA(a=para$a,b=para$b,x0=t(x_test))
+test_error = mean(y_test_pred != y_test)
+cat('Train error of LDA is:',train_error,', Test error of LDA is:', test_error,'.\n')
+```
+```{r 42, echo=TRUE}
+plot(x_test[1,1:100],x_test[2,1:100],col=y_test_pred[1:100]+1,pch=19,main='LDA classification on test set as dim=2')
+```
+
+```{r 43, echo=TRUE}
+KNN_multi = function(x0, x, y, K, C) {
+    distances = sqrt(colSums((x - x0)^2))  # Euclidean distance between x0 and each x[,i]
+    o = order(distances)  # order of the training points by distance from x0 (nearest to farthest)
+    p_hat = sapply(1:C, function(j){sum(y[o[1:K]]==j)/K})  # p_hat[j] = proportion of y values of the K nearest training points that are equal to j.
+    return(p_hat)  # return estimated probabilities
+}
+KNN_multi_predict = function(x0, x, y, K, C) {
+    p_hat = KNN_multi(x0, x, y, K, C)  # compute the estimated probabilities
+    y0 = which.max(p_hat)  # find the class with the highest estimated probability
+    return(y0)  # return the predicted class
+}
+C = 3  # number of classes
+K = 9  # number of neighbors to use
+y_hat = apply(x, 2, function(x0) { KNN_multi_predict(x0, x, y, K, C) })  # predictions on the training set
+y_test_hat = apply(x_test, 2, function(x0) { KNN_multi_predict(x0, x, y, K, C) })  # predictions on the test set
+train_error = mean(y_hat != y)  # compute the training error rate
+test_error = mean(y_test_hat != y_test) 
+cat('Train error of KNN is:',train_error,', Test error of KNN is:', test_error,'.\n')
+```
+
+```{r 44, echo=TRUE}
+# compute the test error rate
+plot(x_test[1,1:100],x_test[2,1:100],col=y_test_hat[1:100]+1,pch=19,main='KNN classification on test set as dim=2')
+```
+
+```{r 45, echo=TRUE}
+set.seed(1)  # reset the random number generator
+d = 20  # dimension of each training point x_i
+n = 100  # number of training samples to simulate
+n_test = 10000  # number of test samples to simulate
+f = function(x0) { (x0[1]>0)+(x0[2]>0)+1 }  # true relationship between x's and y's
+x = matrix(rnorm(n*d),d,n)  # simulate matrix of training x's
+y = apply(x,2,f)  # simulate training y's with no noise
+x_test = matrix(rnorm(n_test*d),d,n_test)  # simulate test x's
+y_test = apply(x_test,2,f)  # simulate test y's
+plot(x_test[1,1:100],x_test[2,1:100],col=y_test+1,pch=19,main='test data distribution as dim=20')
+```
+```{r 46, echo=TRUE}
+para20<-LDApara(X=t(x),Y=y,K=3)
+y_pred20<-LDA(a=para20$a,b=para20$b,x0=t(x))
+train_error = mean(y_pred20 != y)
+y_test_pred20<-LDA(a=para20$a,b=para20$b,x0=t(x_test))
+test_error = mean(y_test_pred20 != y_test)
+cat('Train error of LDA is:',train_error,', Test error of LDA is:', test_error,'.\n')
+```
+```{r 47, echo=TRUE}
+plot(x_test[1,1:100],x_test[2,1:100],col=y_test_pred20[1:100]+1,pch=19,main='LDA classification on test set as dim=20')
+```
+
+```{r 48, echo=TRUE}
+C = 3  # number of classes
+K = 9  # number of neighbors to use
+y_hat = apply(x, 2, function(x0) { KNN_multi_predict(x0, x, y, K, C) })  # predictions on the training set
+y_test_hat = apply(x_test, 2, function(x0) { KNN_multi_predict(x0, x, y, K, C) })  # predictions on the test set
+train_error = mean(y_hat != y)  # compute the training error rate
+test_error = mean(y_test_hat != y_test) 
+cat('Train error of KNN is:',train_error,', Test error of KNN is:', test_error,'.\n')
+```
+
+```{r 49, echo=TRUE}
+# compute the test error rate
+plot(x_test[1,1:100],x_test[2,1:100],col=y_test_hat[1:100]+1,pch=19,main='KNN classification on test set as dim=20')
+##5
+```
+
+
+From the error and the plots, we can see that when dim=2,the KNN has lower train and test error comparing to the LDA; when dim=20, the LDA has lower train and test error comparing to the KNN. Both two methods has lower error rate on the dim=2 set than dim=20 set.
+
+
+For the performance on dim=2 and dim=20 dataset, when the data is more flexiable, the variance of the model increases, although the bias is decreasing, the model is overfitted and the test error will increasing, thus both two methods has higher test error on dim=20 test set than the dim=2 test set.
+
+
+For the performance on dim=2 dataset between LDA and KNN, from the plot we can see that the decision boundary of the LDA is linear, thus some points close to the boundary can be misclassified by the LDA; the KNN aviod this problem since the class is determined by the nearby k neighbors, thus only points is very far from its class cluster will be misclassified, thus it has lower error rate comparing to LDA.
+
+
+##5
+(a)
+```{r 51, echo=TRUE}
+library(MASS)
+library(class)
+library(ISLR)
+summary(Weekly)
+```
+
+```{r 512, echo=TRUE}
+pairs(Weekly)
+```
+```{r 513, echo=TRUE}
+library(corrplot)
+corrr<-cor(Weekly[,-9])
+corrplot::corrplot(corrr)
+```
+
+From the result, we can see that the volume and years are significantly correlated, and the correlation between other variable pairs are not statistically significant.
+
+
+(b)
+```{r 52, echo=TRUE}
+logreg<-glm(Direction~Lag1+Lag2+Lag3+Lag4+Lag5+Volume,data=Weekly,family = 'binomial')
+summary(logreg)
+```
+
+From the result, we can see that Lag2 is statistically significant associated with Directions, with p-value equal to 0.0296. The other predictors are not significant.
+
+
+(c)
+```{r 53, echo=TRUE}
+probs = predict(logreg, type = "response")
+pred = rep("Down", length(probs))
+pred[probs > 0.5] = "Up"
+table(pred, Weekly$Direction)
+```
+
+From the confusion matrix, we can see that overall fraction of correction predictions is (54+557)/(54+430+48+557)=56.1%. The confusion matrix shows that the logistic regression predicts with high accuracy when the true direction is up, and it predicts with low accuracy when the true direction is down.
+
+(d)
+```{r 54, echo=TRUE}
+train = (Weekly$Year < 2009)
+Weekly_test= Weekly[!train, ]
+fit = glm(Direction ~ Lag2, data = Weekly, family = 'binomial', subset = train)
+probs = predict(fit, Weekly_test, type = "response")
+pred = rep("Down", length(probs))
+pred[probs > 0.5] = "Up"
+Direction_test = Weekly$Direction[!train]
+table(pred, Direction_test)
+```
+
+From the result, we can see that the overall fraction of correct predcitions is (9+56)/(34+5+9+56)=62.5%.
+
+
+(e)
+```{r 55, echo=TRUE}
+lda_fit = lda(Direction ~ Lag2, data = Weekly, subset = train)
+lda_pred = predict(lda_fit, Weekly_test)
+table(lda_pred$class, Direction_test)
+```
+
+From the result, we can see that the overall fraction of correct predcitions of LDA is (9+56)/(34+5+9+56)=62.5%.
+
+
+(f)
+```{r 56, echo=TRUE}
+qda_fit = qda(Direction ~ Lag2, data = Weekly, subset = train)
+qda_pred = predict(qda_fit, Weekly_test)
+table(qda_pred$class, Direction_test)
+```
+
+From the result, we can see that the overall fraction of correct predcitions of QDA is (0+61)/(43+61)=58.7%.
+
+(g)
+```{r 57, echo=TRUE}
+train_X = as.matrix(Weekly$Lag2[train])
+test_X = as.matrix(Weekly$Lag2[!train])
+train_Direction = Weekly$Direction[train]
+set.seed(1)
+knn_pred = knn(train_X, test_X, train_Direction, k = 1)
+table(knn_pred, Direction_test)
+```
+
+
+From the result, we can see that the overall fraction of correct predcitions of KNN when K=1 is (21+31)/(21+31+22+30)=50.0%.
+
+
+(h)From the results, the logistic regression and LDA provie the best result on this data, both have overall fraction of correct predictions for the hold out data as 62.5%.
+
+
+(i)
+
+```{r 581, echo=TRUE}
+fit = glm(Direction ~ poly(Lag2,3), data = Weekly, family = 'binomial', subset = train)
+probs = predict(fit, Weekly_test, type = "response")
+pred = rep("Down", length(probs))
+pred[probs > 0.5] = "Up"
+Direction_test = Weekly$Direction[!train]
+table(pred, Direction_test)
+accuracy=mean(pred==Direction_test)
+accuracy
+```
+
+```{r 582, echo=TRUE}
+fit = glm(Direction ~ Lag2:Lag5, data = Weekly, family = 'binomial', subset = train)
+probs = predict(fit, Weekly_test, type = "response")
+pred = rep("Down", length(probs))
+pred[probs > 0.5] = "Up"
+Direction_test = Weekly$Direction[!train]
+table(pred, Direction_test)
+accuracy=mean(pred==Direction_test)
+accuracy
+```
+
+```{r 583, echo=TRUE}
+lda_fit = lda(Direction ~ poly(Lag2,2), data = Weekly, subset = train)
+lda_pred = predict(lda_fit, Weekly_test)
+table(lda_pred$class, Direction_test)
+accuracy=mean(lda_pred$class==Direction_test)
+accuracy
+```
+
+```{r 584, echo=TRUE}
+qda_fit = qda(Direction ~ poly(Lag2,2), data = Weekly, subset = train)
+qda_pred = predict(qda_fit, Weekly_test)
+table(qda_pred$class, Direction_test)
+accuracy=mean(qda_pred$class==Direction_test)
+accuracy
+```
+
+```{r 585, echo=TRUE}
+train_X = as.matrix(Weekly$Lag2[train])
+test_X = as.matrix(Weekly$Lag2[!train])
+train_Direction = Weekly$Direction[train]
+set.seed(1)
+acc=0
+ksel=0
+for (i in 1:100){
+  knn_pred = knn(train_X, test_X, train_Direction, k = i)
+  table(knn_pred, Direction_test)
+  c=mean(knn_pred==Direction_test)
+  if (c>=acc) {
+    ksel=i
+    acc=c
+  }
+}
+knn_pred = knn(train_X, test_X, train_Direction, k = ksel)
+table(knn_pred, Direction_test)
+accuracy=mean(knn_pred==Direction_test)
+accuracy
+```
+
+
+Thus from the result, we can see that for logistic regression and LDA, the orignal one has the highest accuracy; for QDA, when we use the quadratic form of Lag2, the accuracy is 61.5% which is higher than the original QDA; for KNN, when we use the K=96, the accuracy is 60.6%, which is also higher than the original KNN. Thus, the overall best model is Logistic regression and LDA with only Lag2 as the predictor.

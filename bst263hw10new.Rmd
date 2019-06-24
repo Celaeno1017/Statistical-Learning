@@ -1,0 +1,121 @@
+---
+title: "bst263hw10"
+author: "Jiangshan"
+date: "5/5/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Part A 
+
+
+(a)
+```{r 701}
+library(ISLR)
+med<-median(Auto$mpg)
+Auto$gasbinary[which(Auto$mpg>med)]<-1
+Auto$gasbinary[which(Auto$mpg<=med)]<-0
+Auto1<-subset(Auto, select=-c(mpg))
+```
+
+
+
+(b)
+```{r 702}
+library(e1071)
+
+set.seed(1)
+
+tune.out=tune(svm, factor(gasbinary)~., data=Auto1, kernel="linear",
+ranges=list(cost=c(0.01,0.1,1,10,100,1000)))
+
+summary(tune.out)
+
+```
+
+
+From the result, we can see that when the cost of the support vector classifier with linear kernel is equal to 1, the cross-validation error of the model is minimum, which is 0.0918.
+
+
+(c)
+
+
+First, we fit the support vector classifier using the radial kernel. The result of the fitted models with different costs and gamma values are as follows:
+
+```{r 703}
+set.seed(1)
+
+tune.out2=tune(svm, factor(gasbinary)~., data=Auto1, kernel="radial",
+ranges=list(cost=c(0.01,0.1,1,10,100,1000),gamma=c(0.01, 0.05, 0.1, 0.5, 1, 5, 10, 50, 100)))
+
+summary(tune.out2)
+
+```
+
+
+From the result, we can see that when the cost of the support vector classifier with radial kernel is equal to 10, and the gamma of the radial kenrel is equal to 0.1, the cross-validation error of the model is minimum, which is 0.0764.
+
+
+
+Then, we fit the support vector classifier using the polynomial kernel. The result of the fitted models with different costs and degrees are as follows:
+
+```{r 704}
+set.seed(1)
+
+tune.out3=tune(svm, factor(gasbinary)~., data=Auto1, kernel="polynomial",
+ranges=list(cost=c(0.01,0.1,1,10,100,1000),degree=c(2,3,4,5)))
+
+summary(tune.out3)
+
+```
+
+
+From the result, we can see that when the cost of the support vector classifier with polynomial kernel is equal to 1000, and the degree of the polynomial kenrel is equal to 3, the cross-validation error of the model is minimum, which is 0.263.
+
+
+Comparing three kernels, we find that the radial kernel gives the best performance, and the polynomial kernel shows the highest cross validation error. Thus, for prediction, I would pick the radial kernel for model fitting.
+
+
+(d)
+
+```{r 705}
+svmfit.linear = svm(factor(gasbinary) ~ ., data = Auto1, kernel = "linear", cost = 1)
+svmfit.poly = svm(factor(gasbinary) ~ ., data = Auto1, kernel = "polynomial", cost = 1000, 
+    degree = 3)
+svmfit.radial = svm(factor(gasbinary) ~ ., data = Auto1, kernel = "radial", cost = 10, gamma = 0.1)
+plotpairs = function(fit) {
+  for (i in names(Auto1)[!(names(Auto1) %in% c("gasbinary","name"))]){
+     for (j in names(Auto1)[!(names(Auto1) %in% c(i, "gasbinary","name"))]) {
+        plot(fit, Auto1, as.formula(paste(i,"~", j, sep = "")),slice=apply(Auto1[names(Auto1)[!(names(Auto1) %in% c(i,j, "gasbinary","name"))]],2,FUN = median))
+    }
+  }
+   
+}
+plotpairs(svmfit.linear)
+
+```
+
+
+
+```{r 706}
+plotpairs(svmfit.radial)
+
+```
+
+
+```{r 707, echo=TRUE}
+svm.multiplot <- function(svmfit) {
+  for (i in 2:7) {
+    for (j in i:7) {
+      plot(svmfit, Auto, 
+           as.formula(paste(colnames(Auto)[i-1],'~',colnames(Auto)[j])),
+           slice=Auto[3,-c(i-1,j,9)])
+    }
+  }
+}
+svm.multiplot(svmfit.poly)
+```
+From the variable plots for three support vector classifier models, we find that all the three kernel models have clear decision boundary for classifying two gas mileage classes, however, the linear kernel model has linear boundary, and radial and polynomial kernel model have non-linear boundary.  For the linear kernel model, all the decision boundaries are linear in each plot. We can see that the support vectors are closely along the decision boundary, and the number of support vectors are relatively small. This is because for the linear kernel model, the best model we use has normal cost values, but the flexiable linear margin can't separate the non-linear data perfectly. Thus, for this non-lienarly separated data, the model has comparaly high error rate. For the radial model, almost all the boundary are non-linear. And we can see that for this model, the number of support vectors are comparaly large, and support vectors are comparaly far away the decision boundary. This is because although the model has comparaly high cost value so that the margin is not very flexialbe,  the model decision boundary is non-linear, thus the model is more flexiable and can give a better accuracy when predicting the non-lienarly separatable data. For polynomial model, we can see almost all the points are classified as one class, with little points are classified accuratly. Since the cost of this model is very high, thus it tends to be very conservative and margin is least flexiable, which suggest the kernel is not fitted for this particular problem.

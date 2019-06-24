@@ -1,0 +1,218 @@
+---
+title: "Lab 8. Nonlinear Methods"
+output: pdf_document
+---
+
+\section{1. Splines}
+In this section, we are going to look into three splines methods: linear splines, cubic splines and natural cubic splines. In each subsection, we are going to learn the specific command line to implement the method, and how to build up an equivalent model just using the basic 'lm' function.
+
+\subsection{1.1 Linear Splines}
+```{r fig1, out.width = '70%',fig.align = "center"}
+## Generate the data
+set.seed(263)
+x=sort(c(runif(25,0,7),runif(50,5,15),runif(25,13,20)))
+y=-(x-3)^3+(x-6)^3+(x-9)^3+1000+rnorm(100,0,30)
+plot(x,y)
+```
+  
+Now let's introduce the "bs" function in "splines" package. For example, if we want to apply linear splines on the data we just simulated, we code like this:
+
+```{r fig2, out.width = '70%',fig.align = "center"}
+library(splines)
+fit1 = lm(y~bs(x,df=4,degree=1))
+## df=4 means we want 3 knots (by default, they are 25, 50 and 75 percentiles, but 
+## essentially, it means we have 4 slopes to estimate), and degree=1 means we want 
+## it linear.
+plot(x,y)
+lines(x,fitted(fit1),col="red")
+```
+```{r fig3, out.width = '70%',fig.align = "center"}
+## Now what if I want self-defined knots instead of those default knots?
+fit2 = lm(y~bs(x,knots=quantile(x,c(0.25,0.5,0.75)),degree=1))
+plot(x,y)
+lines(x,fitted(fit2),col="red")
+```
+```{r}
+## double check if fit1 is equivalent to fit2
+sum(abs(fitted(fit1)-fitted(fit2)))
+```
+Without using "bs" function, can we produce the same result using "lm" function and self-defined basis functions?
+```{r fig4, out.width = '70%',fig.align = "center"}
+sp1=(x-quantile(x,0.25))*((x-quantile(x,0.25))>0)
+sp2=(x-quantile(x,0.50))*((x-quantile(x,0.50))>0)
+sp3=(x-quantile(x,0.75))*((x-quantile(x,0.75))>0)
+fit3 = lm(y~x+sp1+sp2+sp3)
+plot(x,y)
+lines(x,fitted(fit3),col="red")
+```
+```{r}
+## double check this model is equivalent to previous models
+sum(abs(fitted(fit1)-fitted(fit3)))
+```
+
+```{r fig5, fig.height = 5, fig.width = 8,fig.align = "center"}
+## what are sp1, sp2 and sp3?
+plot(x,sp1,'l',ylab="Splines")
+lines(x,sp2,col='red')
+lines(x,sp3,col='blue')
+legend("topleft", legend=c("sp1","sp2","sp3"),lty=rep(1,3),col=c('black','red','blue'),
+       box.col="white",inset=0.01,xpd=TRUE)
+```
+
+
+
+**Question (Teamwork):**  
+Could you write down the linear model in the code above in the form of $y=\beta_0+\beta_1x+...$(specify sp1,sp2 and sp3 in terms of $x$ explicitly)? Calculate the slope of each one of the 4 pieces based on the regression coefficient output from fit3.
+  The linear model is y=beta_0+beta_1x+beta_2(x-q1)_++beta_3(x-q2)_++beta_4(x-q3)_+.
+  The slope is:
+  first:beta1
+  second:beta1+beta2
+  third:beta1+beta2+beta3
+  fourth:beta1+beta2+beta3+beta4
+\vspace{5cm}
+  
+\subsection{1.2 Cubic Splines}
+If you want a smoother fit, try cubic splines. The change in the command line from linear splines to cubic splines is very intuitive.
+```{r fig6, out.width = '70%',fig.align = "center"}
+fit4=lm(y~bs(x,knots=quantile(x,c(0.25,0.5,0.75)),degree=3))
+plot(x,y)
+lines(x,fitted(fit4),col="red")
+## You just need to change "degree=1" to "degree=3" to tell R it's "cubic".
+```
+
+Now the remaining questions are:  
+1. What if I want to use the "df" option instead of knots, what is the correct df I should specify to make the model equivalent to fit4?  
+2. How to build up an equivalent model without using "bs" function? 
+  
+\vspace{0.5cm}
+  
+To answer the first question, let's figure the second out first, then the answer to question 1 will be revealed automatically.
+
+```{r fig7, out.width = '70%',fig.align = "center"}
+x1=(x-quantile(x,0.25))*((x-quantile(x,0.25))>0)
+x2=(x-quantile(x,0.50))*((x-quantile(x,0.50))>0)
+x3=(x-quantile(x,0.75))*((x-quantile(x,0.75))>0)
+sp1 = x1^3
+sp2 = x2^3
+sp3 = x3^3
+x_sq = x^2
+x_cb = x^3
+fit5 = lm(y~x+x_sq+x_cb+sp1+sp2+sp3)
+plot(x,y)
+lines(x,fitted(fit5),col="red")
+```
+```{r}
+## again, double check if fit4 and fit5 are equivalent
+sum(abs(fitted(fit5)-fitted(fit4)))
+```
+
+```{r fig8, fig.height = 5, fig.width = 8,fig.align = "center"}
+## what are x,x_sq,x_cb, sp1, sp2 and sp3?
+plot(x,x,'l',ylab="Splines")
+lines(x,sp1,col='green')
+lines(x,sp2,col='red')
+lines(x,sp3,col='blue')
+lines(x,x_sq,col='orange')
+lines(x,x_cb,col='pink')
+legend("bottomright", legend=c('x',"sp1","sp2","sp3",'x_sq','x_cb'),lty=rep(1,6),
+       col=c('black','green','red','blue','orange','pink'),box.col="white",inset=0.01,xpd=TRUE)
+```
+
+
+**Question (Individual work):**  
+Could you write down the model in the code above in the form of $y=\beta_0+\beta_1x+...$? How many coefficients are there in the model? What do you think is the correct df we should specify if we use "fit6 = lm(y~bs(x,df=?,degree=3))"? Verify it by comparing the predictions from fit4 with the ones from fit6.
+
+The model is y=bet_0+beta_1x+beta_2x^2+beta_3x^3+beta_4(x-q1)_+^3+beta_5(x-q2)_+^3+beta_6(x-q3)_+^3. There are 6 coefficients and 1 intercept in the model, the degree of the freedom is 6. 
+
+```{r,eval=FALSE,echo=FALSE}
+fit6 = lm(y~bs(x,df=6,degree=3))
+sum(abs(fitted(fit6)-fitted(fit4)))
+```
+  
+\vspace{5cm}
+  
+\subsection{1.3 Natural Cubic Splines}
+Difference from cubic splines: It forces the two ends to be linear.
+```{r fig9, out.width = '70%',fig.align = "center"}
+fit7 = lm(y~ns(x,df=6))
+plot(x,y)
+lines(x,fitted(fit7),col="red")
+## check the R document for more details like where the knots are by default
+```
+
+\subsection{1.4 Cross-validation for the best number of knots}
+**[Teamwork]:**  
+1. If the number of knots is 1, then the knot is 50 percentile. If the number of knots is 2, the knots are 33.3 and 66.6 percentile, so on so forth.  
+2. Do a 10-fold cross-validation to pick the best number of knots with respect to MSE (mean square error).  
+3. Submit your script to Canvas by the end of the class.  
+
+```{r team}
+knot_max=6
+nfolds = 10
+n=100
+# number of folds to use for cross-validation
+permutation = sample(1:n)  # random ordering of all the available data
+MSE_fold = matrix(0,nfolds,knot_max)  # vector to hold MSE for each fold and each K
+for (j in 1:nfolds) {
+    pseudotest = permutation[floor((j-1)*n/nfolds+1) : floor(j*n/nfolds)]  # pseudo-test set for this fold
+    pseudotrain = setdiff(1:n, pseudotest)  # pseudo-training set for this fold
+    for (K in 1:knot_max) {
+        model=lm(y[pseudotrain]~bs(x[pseudotrain],df=3+K,degree=3))
+        y_hat = sapply(x[pseudotest], function(x0) { predict(model,data=x0) })  # run KNN at each x in the pseudo-test set
+        MSE_fold[j,K] = mean((y[pseudotest] - y_hat)^2)  # compute MSE on the pseudo-test set
+    }
+}
+MSE_cv = colMeans(MSE_fold)  # average across folds to obtain CV estimate of test MSE for each K
+
+plot(1:knot_max, MSE_cv)  # plot CV estimate of test MSE for each K
+
+# Choose the value of K that minimizes estimated test MSE
+K_cv = which.min(MSE_cv)
+K_cv
+
+fit1 = lm(y~bs(x,df=3+K_cv,degree=3))
+## df=4 means we want 3 knots (by default, they are 25, 50 and 75 percentiles, but 
+## essentially, it means we have 4 slopes to estimate), and degree=1 means we want 
+## it linear.
+plot(x,y)
+lines(x,fitted(fit1),col="red")
+```
+From the CV, we found that the performance is best when we use one knot in the cubic spline. 
+\newpage
+\section{2. GAM}
+\subsection{2.1 Basic Commands}
+```{r,fig10, out.width = '70%',fig.align = "center"}
+library(gam)
+fit8=gam(y~s(x,4))  ## smoothing splines
+plot(x,y)
+lines(x,fitted(fit8),col='red')
+```
+GAM is very flexible, if you believe y is nonliear in x1 but linear in x2, you can specify a model like gam(y~s(x1,4)+x2).
+
+```{r}
+## how to use it to predict?
+newd <- data.frame(x=c(5,10,15))
+predict.Gam(fit8,newd)
+```
+
+
+\subsection{2.2 House price prediction - revisit}
+We are going to revisit the dataset we used in the linear regression lab, house sale prices for King County. This time, try to use GAM to make predictions and compare them with the predictions you got from linear regressions. Do you observe a significant improvement? (Try out different choices of predictors and basis functions)
+\vspace{1cm}  
+  
+**Revisit**  
+This dataset('kc_house_data.csv') contains house sale prices for King County, which includes Seattle. It includes homes sold between May 2014 and May 2015. There are 19 house features plus the price and the id columns, along with 21613 observations. The dictionary of the variables is listed in the next page.
+```{r}
+## Load in the data, split the data into training set and test set
+house = read.csv('kc_house_data.csv',header = T)
+trainset = house[1:floor(nrow(house)*0.8),]
+testset = house[-(1:floor(nrow(house)*0.8)),]
+```
+```{r fig11, fig.height = 3, fig.width = 8,fig.align = "center"}
+## A toy example to show individual functions
+fit9=gam(price~s(sqft_living,5)+s(grade,4)+waterfront,data=trainset)
+par(mfrow=c(1,3))
+plot(fit9,se=TRUE,col='blue')
+```
+
+![variable_dict](variable_dict.PNG)

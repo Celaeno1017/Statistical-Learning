@@ -1,0 +1,177 @@
+---
+title: "BST 263 Clustering Lab"
+output: html_document
+---
+
+## Data and Setup
+
+```{r INSTALL, include=FALSE}
+#Include Statements
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("ISLR")
+library(ISLR)
+```
+
+# The NCI60 Data
+The NCI60 cancer cell line microarray data consists of 6,830 gene expression measurements (features) on 64 cancer cell lines (observations). Expression data is a measure of how much each of the 6,380 genes are being used.
+```{r SETUP, include=TRUE}
+library(ISLR)
+nci.labs=NCI60$labs
+nci.data=NCI60$data
+dim(nci.data)
+nci.labs[1:4]
+table(nci.labs)
+sd.data=scale(nci.data)
+```
+
+```{r KMEANS DATA, include=TRUE}
+#generates two Gaussian clusters
+generate_data<-function(n){
+data=matrix(rnorm(n*2), ncol=2)
+data[1:(n/2),1]=data[1:(n/2),1]+1.5
+data[(n/2):n,1]=data[(n/2):n,1]-1.5
+return(data)
+}
+```
+## PCA
+```{r PCA NCI, include=TRUE}
+pr.out=prcomp(t(NCI60$data), scale=TRUE)
+
+plot(pr.out$rotation[,"PC1"],pr.out$rotation[,"PC2"],xlab = "PC1",ylab="PC2")
+text(pr.out$rotation[,"PC1"],pr.out$rotation[,"PC2"],labels = NCI60$labs)
+#Shorter Names
+plot(pr.out$rotation[,"PC1"],pr.out$rotation[,"PC2"],xlab = "PC1",ylab="PC2",type="n")
+text(pr.out$rotation[,"PC1"],pr.out$rotation[,"PC2"],labels = substring(NCI60$labs,1,2),cex=0.75)
+```
+
+
+
+## Clustering
+
+# K-Means Clustering
+
+
+```{r KMEANS, include=TRUE}
+set.seed(2)
+x <- generate_data(300)
+
+km.out=kmeans(x,2,nstart=20) #two cluster centers, 20 restarts
+km.out$cluster
+plot(x, col=(km.out$cluster+1), main="K-Means Clustering Results with K=2", xlab="", ylab="", pch=20, cex=2)
+#set.seed(4)
+km.out=kmeans(x,3,nstart=20) #three cluster centers, 20 restarts
+km.out
+plot(x, col=(km.out$cluster+1), main="K-Means Clustering Results with K=3", xlab="", ylab="", pch=20, cex=2)
+km.out=kmeans(x,3,nstart=1)
+km.out$tot.withinss
+km.out=kmeans(x,3,nstart=20)
+km.out$tot.withinss
+```
+
+# Question 1
+
+Write a loop where you run K-means 5 times with nstart=1 and k=3 and plot the results of each run. Compare to running the algorithm 5 times with nstart=50
+
+```{r ANSWER 1, include=TRUE}
+for (i in 1:5) {
+  km.out=kmeans(x,3,nstart = 1)
+  plot(x, col=(km.out$cluster+1), main="K-Means Clustering Results with K=3,nstart=1", xlab="", ylab="", pch=20, cex=2)
+}
+
+for (i in 1:5) {
+  km.out=kmeans(x,3,nstart = 50)
+  plot(x, col=(km.out$cluster+1), main="K-Means Clustering Results with K=3, nstart=50", xlab="", ylab="", pch=20, cex=2)
+}
+```
+
+# Question 2
+
+Write a loop where you run K-means 1000 times for 3 clusters with nstart=1 and nstart=5. Compare tot.withinss by plotting a histogram of the results of nstart=1 compared to nstart=5. What do you conclude from the plots? Why are they different?
+
+```{r ANSWER 2, include=TRUE}
+ssq_1<-matrix(data = NA,nrow = 1000,ncol = 3)
+for (i in 1:1000) {
+  km.out=kmeans(x,3,nstart = 1)
+  ssq_1[i,]<-km.out$withinss
+  
+}
+ssq_5<-matrix(data = NA,nrow = 1000,ncol = 3)
+for (i in 1:1000) {
+  km.out=kmeans(x,3,nstart = 5)
+  ssq_5[i,]<-km.out$withinss
+}
+
+hist(apply(ssq_1,1,FUN = sum))
+hist(apply(ssq_5,1,FUN = sum))
+```
+
+# Hierarchical Clustering
+
+```{r HIERARCHICAL PART 1, include=TRUE}
+set.seed(2)
+x <- generate_data(100)
+hc.complete=hclust(dist(x), method="complete")
+hc.average=hclust(dist(x), method="average")
+hc.single=hclust(dist(x), method="single")
+par(mfrow=c(1,3))
+plot(hc.complete,main="Complete Linkage", xlab="", sub="", cex=.9)
+plot(hc.average, main="Average Linkage", xlab="", sub="", cex=.9)
+plot(hc.single, main="Single Linkage", xlab="", sub="", cex=.9)
+cutree(hc.complete, 2)
+cutree(hc.average, 2)
+cutree(hc.single, 2)
+cutree(hc.single, 4)
+xsc=scale(x)
+plot(hclust(dist(xsc), method="complete"), main="Hierarchical Clustering with Scaled Features")
+x=matrix(rnorm(30*3), ncol=3)
+dd=as.dist(1-cor(t(x)))
+plot(hclust(dd, method="complete"), main="Complete Linkage with Correlation-Based Distance", xlab="", sub="")
+```
+
+
+
+```{r HIERARCHICAL PART 2, include=TRUE}
+par(mfrow=c(1,3))
+data.dist=dist(sd.data)
+plot(hclust(data.dist), labels=nci.labs, main="Complete Linkage", xlab="", sub="",ylab="")
+plot(hclust(data.dist, method="average"), labels=nci.labs, main="Average Linkage", xlab="", sub="",ylab="")
+plot(hclust(data.dist, method="single"), labels=nci.labs,  main="Single Linkage", xlab="", sub="",ylab="")
+hc.out=hclust(dist(sd.data))
+hc.clusters=cutree(hc.out,4)
+table(hc.clusters,nci.labs)
+par(mfrow=c(1,1))
+plot(hc.out, labels=nci.labs)
+abline(h=139, col="red")
+hc.out
+
+hc.out=hclust(dist(sd.data))
+hc.clusters=cutree(hc.out,2)
+plot(pr.out$rotation[,"PC1"],pr.out$rotation[,"PC2"],xlab = "PC1",ylab="PC2",main="PCA plot colored by HC cluster labels",type="n")
+text(pr.out$rotation[,"PC1"],pr.out$rotation[,"PC2"],labels = substring(NCI60$labs,1,2),col=hc.clusters,cex=0.75)
+
+```
+
+# Question 3
+
+Look at the dendrograms carefully. Which clustering method shows us the pattern we saw in the PCA plot?
+```{r ANSWER 3, include=TRUE}
+# complete method
+
+```
+
+# Question 4
+
+Try looking at the PCA plots labeled with colors based on the clustering methods we've seen. Do any of them match up?
+```{r ANSWER 4, include=TRUE}
+
+
+```
+
+## Group Exercise
+One way of picking the number of clusters is cluster stability. Re-run K-means with with number of clusters k ranging from 1 to 10. Run k-means 100 times with nstart=1 for each k and compute "tot.withinss" for each clustering result. Plot the variance in "tot.withinss" as a function of the number of clusters k. Report which k has the lowest value. First group to produce code that successfully does this wins the challenge. Your solution has to correctly implement the instructions of the challenge, but doesn't have to identify 2 as the correct number of clusters.
+```{r CHALLENGE, include=TRUE}
+set.seed(2)
+x <- generate_data(1000)
+
+
+```

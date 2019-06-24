@@ -1,0 +1,167 @@
+---
+title: "bst263hw9"
+author: "Jiangshan"
+date: "4/27/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+PartA Question 7
+
+```{r parta7, echo=TRUE}
+library(MASS)
+library(randomForest)
+
+MSE=matrix(0,nrow=7,ncol=40)
+set.seed(1)
+train = sample(1:nrow(Boston), nrow(Boston)/2)
+n=1
+for (i in seq(1,13,2)){
+  k=1
+  for (j in seq(1,200,5)) {
+    
+    bag.boston=randomForest(medv~.,data=Boston,subset=train,mtry=i,ntree=j,importance=TRUE)
+    bag.boston
+    yhat.bag = predict(bag.boston,newdata=Boston[-train,])
+    boston.test=Boston[-train,"medv"]
+    MSE[n,k]=mean((yhat.bag-boston.test)^2)
+    k=k+1
+  }
+  n=n+1
+}
+
+plot(1:40, MSE[1,], col = 1, type = "l", xlab = "Number of Trees*5", 
+    ylab = "Test MSE",ylim = c(10, 30))
+for (i in 2:7) {
+  lines(1:40, MSE[i,], col = i, type = "l")
+}
+
+legend("topright", c("m=1", "m=3", "m=5","m=7","m=9","m=11","m=13"), col = c(1:7), 
+    cex = 1, lty = 1)
+```
+
+
+From the result plot, we can see that for different number of predictors chosen in a single tree, as the number of trees increasing, the test error decreases significantly when the tree number less than 100. However, when the tree number are larger than 100, as the tree number increasing, the test error doesn't change too much, it maintains a certain level for different number of predictors chosing trees. If we fixed the number of trees in the random forest, we can find that when the number of predictors in each tree is 5, 7, or 9, the test error is minimum comparing to other settings. This number is around p/2 where p is total number of predictors we used in the random forest. When the number of predictors used in single tree is too small or too large, the test error is larger comparing to the optimal settings. When the predictor number is too small, the model is underfitting，with little interaction effect considered. When the predictor number is too large, the correlation between single trees are too large, which will increase the variance of the predicted outcome, which lead the model overfitting.
+
+
+Part A Question 10
+
+
+(a)
+```{r parta101, echo=TRUE}
+library(ISLR)
+dataset<-Hitters
+dataset<-dataset[-which(is.na(dataset$Salary)), ]
+dataset$Salary<-log(dataset$Salary)
+```
+
+
+(b)
+```{r parta102, echo=TRUE}
+index=1:200
+train_set<-dataset[index,]
+test_set<-dataset[-index,]
+
+```
+
+
+
+(c)
+```{r parta103, echo=TRUE}
+library(gbm)
+
+set.seed(1)
+lambda=seq(0,0.5,0.005)
+train_error = rep(NA, length(lambda))
+test_error = rep(NA, length(lambda))
+for (i in 1:length(lambda)) {
+  boost.hitter=gbm(Salary~.,data=train_set,distribution="gaussian",n.trees=1000,shrinkage = lambda[i])
+  train.pred = predict(boost.hitter, train_set, n.trees = 1000)
+  test.pred = predict(boost.hitter, test_set, n.trees = 1000)
+  train_error[i]=mean((train_set$Salary - train.pred)^2)
+  test_error[i]=mean((test_set$Salary - test.pred)^2)
+}
+
+plot(lambda, train_error, type = "b", xlab = "Shrinkage", ylab = "Train MSE", 
+    col = "blue", pch = 20)
+```
+
+
+The plot of train error change with shrinkage is as above. we can see that as the shrinkage parameter increase, the train MSE is monotonically decreasing, but the rate of decreasing is very low when shrinkage parameter is larger than 0.1. 
+
+(d)
+
+```{r parta104, echo=TRUE}
+plot(lambda, test_error, type = "b", xlab = "Shrinkage", ylab = "Test MSE", 
+    col = "red", pch = 20)
+
+```
+
+```{r parta1042, echo=TRUE}
+lambda[which.min(test_error)]
+```
+
+The plot of train error change with shrinkage is as above. We can see from the plot, test MSE is firstly decreasing very quickly, then slowly increasing as the shrinkage increases. The min test MSE is obtained when lambda is equal to 0.255.
+
+
+(e)
+```{r parta105, echo=TRUE}
+fit = lm(Salary ~ ., data = train_set)
+pred = predict(fit, test_set)
+mean((test_set$Salary - pred)^2)
+
+```
+
+```{r parta1052, echo=TRUE}
+library(glmnet)
+set.seed(1)
+lasso.fit = cv.glmnet(model.matrix(Salary ~ ., data = train_set), train_set$Salary, alpha = 1)
+lasso.pred = predict(lasso.fit, s=lasso.fit$lambda.min, newx = model.matrix(Salary ~ ., data = test_set))
+mean((test_set$Salary - lasso.pred)^2)
+
+```
+
+```{r parta1053, echo=TRUE}
+mean(test_error)
+```
+From the result, we can see that the mean test MSE from the boosting is 0.305 when the shrinkage is in an appropriate range, and the test MSE from the normal linear regression is 0.491, and the test MSE from the lasso regression is 0.4701. Thus, the boosting model is the best model among these three model.
+
+
+
+(f)
+```{r parta106, echo=TRUE}
+boost = gbm(Salary ~ ., data = train_set, distribution = "gaussian", 
+    n.trees = 1000, shrinkage = lambda[which.min(test_error)])
+summary(boost)
+
+
+```
+
+
+From the relative influence of the boosting result, we can see that CAtBat and PutOuts are two important variables that have significant influence on the preiction.
+
+
+
+(g)
+
+```{r parta107, echo=TRUE}
+set.seed(1)
+bagi= randomForest(Salary ~ ., data = train_set, ntree = 1000, mtry = 19)
+bagi_pred = predict(bagi, test_set)
+mean((test_set$Salary - bagi_pred)^2)
+
+
+```
+
+
+From the result, we can see that the test MSE of bagging model with 1000 trees is 0.23, which is a little less than the test MSE of boosting model.
+
+
+
+Part B Question 4
+
+From the part 3, we can see that when combining several same variance random variables and averaging them, the variance of the mean is always less than the variance of single random variable, as long as the correlation between variables are less than 1. Since the prediction of the single full tree is a random variable, thus when we combining and averaging several single full tree with same training data and same set of predictors, the correlation between these trees are typically around 1. Thus, the variance of the prediction is approximately same as the single full tree. However, for each single tree, we pick different subsets of predictors to predict the outcome, then combining these trees and averaging them, the correlation between each tree is much less than 1 due to different training sets, thus, the variance of the average prediction is significant less than that of the single one tree. Thus, by randomly selecting the predictor sets, train several trees and use the averaging predictions as the predicted outcome, the random forest can control the prediction variance.

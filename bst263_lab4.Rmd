@@ -1,0 +1,276 @@
+---
+title: "BST 263 - Lab 4 - Resampling"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
+
+if(!require(boot)){install.packages("boot",repos = "http://cran.us.r-project.org"); require(boot)}
+if(!require(ggplot2)){install.packages("ggplot2",repos = "http://cran.us.r-project.org"); require(ggplot2)}
+if(!require(functional)){install.packages("functional",repos = "http://cran.us.r-project.org"); require(functional)}
+if(!require(rafalib)){install.packages("rafalib",repos = "http://cran.us.r-project.org"); require(rafalib)}
+
+
+```
+
+#RMarkdown
+
+RMarkdown (.rmd) files are an easy way to combine note-taking, code, and output in a single document. This is an important tool for reproducible code, since it helps ensure that code and output are linked, and allows outputting to a variety of formats (called 'knitting').
+
+In an RMarkdown file, any code that is encased in an appropriate code chunk (see below in the *Data* section) can be run either by itself by selecting rows; or as a code chunk by pressing the green arrow; or as part of a process that generates output, and collects it into a readable document, by clicking the *Knit* option and selecting the file type of the output. 
+
+RMarkdown also allows basic formatting of your text. Some useful tips include: a hash or double hash creates header / subhead text; a single set of asterisks surrounding a phrase makes italic text, and a double set makes bold text. 
+
+If you continue in Data Science, you will often be asked to create technical reports which may include code, or non-technical reports which may not. In both cases, RMarkdown files are useful tools.
+
+#Data
+We are going to simulate data so that we know the underlying model and can assess the performance of the model selection procedures. We will create a predictor $x$ and a response $y$. The true model is quadratic. It has the form:
+
+$$y_i = \beta_0+\beta_1 x_i+ \beta_2 x_i^2 + \epsilon $$ 
+
+As you will see, the coefficients have been chosen such that the data forms a parabola in the range of the predictor that we are interested in. We will create two datasets with the same underlying data structure: a training dataset and a validation dataset.
+
+##Individual Exercise 1:
+- Run the code below and look at the plot. How well does our simulated data match the true data?
+
+The data we simulated is evenly distributed around the true data, which the true data is the mean of the simulated data with equal variance at each level of predictors.
+
+- Try changing changing the level of noise in the data generator, and recreating the plot. What happens if you increase the noise level to 10? 100? What if you decrease it to 0.5? 
+
+As the noise level increases, the simulated data is more and more likely normal distributed around 0 with std increases, and we can not recognize how the true data distributed.
+As the noise level decreases, the simulated data is less separated and the trend of the true model is very obvious.
+
+
+
+```{r Data}
+set.seed(52434) #comment this line for fully random results.
+#define specific models
+data_model<-function(x){1-1.24219*x+0.64081*x^2}
+data_generator<-function(x){
+                   noise=2;
+                   data_model(x)+noise*rnorm(mean=0,sd=1,n=1)}
+
+
+
+#function that generates dataframe for our models
+generate_data<-function(count){
+x<-runif(min=0,max=5,n=count)
+y<-sapply(x,data_generator)
+data.frame(x=x,y=y)
+}
+
+#generating data 
+N = 2500
+training_set<-generate_data(N)
+validation_set<-generate_data(N)
+
+#Plotting the data and true model
+par(pty="s")
+plot(training_set$x,training_set$y,
+     xlab="predictor",ylab="response",
+     pch=19,col='black',xlim=c(0,5))
+lines(seq(0, 5, by=0.1),data_model(seq(0, 5, by=0.1)),
+      col='tomato',lwd=2,lty=1)
+
+
+```
+
+Now, we are going to try to use what we've learned in class to estimate the true functional form of our simulated data. We will pretend that we don't know the data model, but using a simluation will help us develop intuition about the modeling process.
+
+
+#Validation Set Approach
+The first method we can use to estimate the functional form of our data is a single validation set. Although this method can be shown to be biased, it still gives reasonable results. The code below fits four simple polynomial models on the training data, then generates predictions from these models for the validation data.
+
+Usage Note: In the lab, I'm using the term *validation set* which matches the terminology in the *Resampling* chapter of *Introduction to Statistical Learning*. You can think of the validation set as identical to the test set.
+
+##Individual Exercise 2:
+Run the data below and answer the questions:
+
+- Which model has the best fit based on the scores?
+
+The quadrtic has the best fit based on the scores since it has the lowest score.
+- Which model has the best fit based on visual inspection of the graphs?
+
+The cubic model has the best fit based on the visual inspection of the graphs.
+- Use the validation set dataset to run, plot, and score a linear model. What do you expect will happen? Does this model perform the way you expected? 
+
+The linear one has very high mse. Yes, it perform the way I expected.
+```{r Validation Set}
+#Fitting 4 models quadratic, cubic, quartic and quintic
+lmfit<-lapply(1:5,  function(k){lm(y~poly(x,k, raw = TRUE),data=training_set)})
+
+#Create a function to score our model fit
+score_model<-function(model){
+mean((validation_set$y -predict(model,validation_set))^2)
+}
+
+#plot the actual validation data and then the prediction line from each model
+par(pty="s")
+plot(validation_set$x, validation_set$y ,
+     xlab="predictor",ylab="response",
+     pch=19,col='black',xlim=c(0,5))
+lines(seq(0, 5, by=0.1),predict(lmfit[[1]], data.frame(x=seq(0, 5, by=0.1)) ),
+      col='tomato',lwd=2,lty=1)
+
+plot(validation_set$x, validation_set$y ,
+     xlab="predictor",ylab="response",
+     pch=19,col='black',xlim=c(0,5))
+lines(seq(0, 5, by=0.1),predict(lmfit[[2]], data.frame(x=seq(0, 5, by=0.1)) ),
+      col='tomato',lwd=2,lty=1)
+
+plot(validation_set$x, validation_set$y ,
+     xlab="predictor",ylab="response",
+     pch=19,col='black',xlim=c(0,5))
+lines(seq(0, 5, by=0.1),predict(lmfit[[3]], data.frame(x=seq(0, 5, by=0.1)) ),
+      col='tomato',lwd=2,lty=1)
+
+plot(validation_set$x, validation_set$y ,
+     xlab="predictor",ylab="response",
+     pch=19,col='black',xlim=c(0,5))
+lines(seq(0, 5, by=0.1),predict(lmfit[[4]], data.frame(x=seq(0, 5, by=0.1)) ),
+      col='tomato',lwd=2,lty=1)
+
+plot(validation_set$x, validation_set$y ,
+     xlab="predictor",ylab="response",
+     pch=19,col='black',xlim=c(0,5))
+lines(seq(0, 5, by=0.1),predict(lmfit[[5]], data.frame(x=seq(0, 5, by=0.1)) ),
+      col='tomato',lwd=2,lty=1)
+
+#Plot the model scores
+#usage note: Curry means generate a new function where
+#            one of the parameters is already filled by
+#            a value of your choosing.
+par(pty="s")
+plot(1:5, sapply(lmfit,score_model),
+    main='Validation Set Approach',
+    xlab="Model Number",ylab="Validation Score",axes=FALSE,frame.plot=TRUE,pch=16)
+    axis(side=1, at=c(1,2,3,4,5))
+
+```
+
+
+# Leave-One-Out Cross-Validation
+The second approach we can try is leave-one-out cross validation. The code below uses leave-one-out cross-validation to predict the relationship between our predictor and response. This involves two steps. First, we fit the same four simple polynomial models that we used for the Validation Set Approach, and then we use cv.glm to perform the cross-validation on our training data. 
+
+##Group exercise 1:
+Run the code below and answer the questions:
+
+- Which model performs the best with cross-validation?
+
+The quadratic model has the best performance with cross-validation.
+- How do the scores compare between LOOCV and validation set? Do we make the same conclusions?
+
+The scores parttern compare between LOOCV and validation set are same, but the value of the scores in LOOCV is less than the score in the validation set, and they make the same conclusions.
+- Try adding a linear model to the set of options. What do you expect to happen? Do the results match your expectations?
+
+The linear model has the highest MSE score comparing to other 4 models. The results of the linear model match my expectations.
+- Why do we use the training data instead of the validation data? What would happen if we used the validation data?
+
+Since the validation data is not always exist in the real world and we can have more round to test different model with limited data, and give us a good result for model selection.
+
+```{r LOOCV}
+cv.err<-rep(0,4)
+for(k in 1:5){
+lm<-glm(y~poly(x,k),data=training_set)
+cv.err[[k]]<-cv.glm(training_set,lm)$delta[1]
+}
+
+par(pty="s")
+plot(1:5, cv.err,main='LOOCV',
+     xlab="Model Number",ylab="Validation Score",axes=FALSE,frame.plot=TRUE,pch=16)
+axis(side=1, at=c(1,2,3,4,5))
+
+```
+
+
+
+# k-fold Cross-Validation
+Another validation method we've learned in class is k-fold cross-validation. 
+
+##Group exercise 2:
+Run the code below and answer the questions:
+
+- Which model performs the best with cross-validation?
+
+The quadratic model performs the best with cross-validation.
+
+- How do the scores compare between k-fold, LOOCV, and Validation Set Approach? Do we make the same conclusions?
+
+The scores in k-fold is very similar to LOOCV but less than validation set. yes, they make the same conclusion.
+- Try adding a linear model to the set of options. What do you expect to happen? Do the results match your expectations?
+
+It performs not good as same as it in LOOCV and Validation set. the linear one has very bad fit. the result match my expectations.
+- We have chosen k = 10 here. Try k = 5, 20, and 1. What do you expect to happen? Do the results line up with your expectations? Plot the results of the validations using k = 2, 5, 10, and 20.
+
+When the fold number is low, such as 2, 5, the score is not stable, when the fold number is high, such as 10, 20, the score is also higher than true mse.
+- Compare LOOCV and k-fold validation. Which method is less computationally intensive? Why do you think that is?
+
+The k-fold validation is less computationally intensive. Since the LOOCV need to run as many time as the number of the training set point, thus it need more time to compute.
+```{r k-Fold CV}
+cv.err.10=rep(0,10)
+for (k in 1:10){
+ glm.fit=glm(y~poly(x,k),data=training_set)
+ cv.err.10[k]=cv.glm(training_set,glm.fit,K=20)$delta[1]
+}
+
+par(pty="s")
+plot(1:10, cv.err.10,main='10-Fold Cross-validation',
+       xlab="Model Number",ylab="Validation Score",axes=FALSE,frame.plot=TRUE,pch=16)
+axis(side=1, at=c(1,2,3,4,5,6,7,8,9,10))
+
+
+```
+
+
+#Bootstrapping
+Finally, we can validate our model using bootstraps. The code below runs 2000 bootstrap samples to validate our 4 candidate models. Here, we assess the results of these bootstraps by comparing the estimated linear coefficient with the true value. 
+
+##Group exercise 3:
+- Which model performs best based on the bootstraps? Does this depend on which coefficient you assess?
+- Here, we know the true value so we can use it to pick the best model. How would you assess the bootstrap results if you didn't know the true value?
+- Compare the bootstraps with the other validation techniques. Which do you prefer?
+- Reproduce the analysis below using the second coefficient of the model instead of the first coefficient.
+
+
+```{r Boot}
+
+rafalib::mypar(2,2)
+for(K in 2:5){
+get_linear_coefficient<-function(data,index)
+{
+  
+  data<-data[index,]
+  summary(lm(y~poly(x,K, raw = TRUE),data=data))$coef[2]
+}
+
+result<-boot(training_set,get_linear_coefficient,2000)
+
+hist(result$t,breaks = 45,col = "black",
+     border="white",probability = TRUE,
+     main=paste("Bootstrap Results (k=",K,")"),
+     xlab="Estimate",ylab="Density")
+lines(density(result$t), lty=2, col="darkgrey", lwd=3) 
+abline(v=mean(result$t),col="red",lwd=3)
+abline(v=-1.24219,col="tomato",lwd=3) #linear coefficient taken from above.
+}
+```
+
+
+#Group Challenge
+Using what we've learned in this lab, try to determine the optimal coefficients and true model for the challenge dataset. The true model is a polynomial with order between 1 and 8. I will score your solutions on a validation dataset. The solution that performs the best on the challenge dataset wins. In the case of ties, the first group to email wins. The winning team will get 3 extra days on Homework 5.
+
+You can use as many or as few approaches as you think necessary. Hint: sometimes looking at results from more than one approach can help give a more complete picture. Send me your solutions via email to kareemcarr@ g.harvard.edu. 
+
+I want the coefficients of your polynomial starting with the constant coefficient. You have to decide the order of the polynomial, and therefore how many coefficients to send me. Write your solution as an R vector. e.g. c(1,0.2,3.0,-0.01)
+
+```{r Challenge}
+#email: kareemcarr@g.harvard.edu
+#Your code here
+challenge_training_set<-read.csv("challenge_training_set.csv")
+
+
+```
+

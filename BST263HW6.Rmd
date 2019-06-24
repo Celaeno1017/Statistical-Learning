@@ -1,0 +1,163 @@
+---
+title: "BST263HW6"
+author: "Jiangshan"
+date: "3/5/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##1.
+
+(a) i. The bias of the $hat(mu)_j(1)$ is 0.
+
+
+ii. Yes, it might be possible to improve. Since from the bias-variance trade-off, when bias of an estimator is 0, the estimator must have high variance, thus we can tolerate a little bias to reduce the variance, which may give us a lower MSE and can improve the estimation.
+
+
+(b)
+```{r 1(b), echo=TRUE}
+set.seed(1)
+p=1000
+mu=runif(p,0,10)
+y=rep(0,p)
+for (j in 1:1000) {y[j]=rnorm(1,mu[j],4)}
+c=seq(0,1,0.01)
+se<-rep(0,length(c))
+for (i in 1:length(c)) {se[i]<-sum((c[i]*y-mu)^2)}
+c[which.min(se)]
+plot(c,se,main='Change of Squared Error with the Change of Shrinkage Parameter')
+```
+
+
+From the plot, we can see that when c=0.66, the squared error reaches its minimum, which is less than the squared error when c=1. Thus, the shrinkage helps reduce the MSE of the estimators.
+
+
+
+(c) 
+i. See the attachment.
+
+
+ii. See the attachment.
+
+
+iii.
+```{r 1(c)1, echo=TRUE}
+biasq<-rep(0,length(c))
+for (i in 1:length(c)) {biasq[i]<-sum(((c[i]-1)*mu)^2)}
+plot(c,biasq,main='Change of Squared Bias with the Change of Shrinkage Parameter')
+```
+
+```{r 1(c)2, echo=TRUE}
+vara<-rep(0,length(c))
+for (i in 1:length(c)) {vara[i]<-sum(c[i]^2*4^2)}
+plot(c,vara,main='Change of Variance with the Change of Shrinkage Parameter')
+```
+
+```{r 1(c)3, echo=TRUE}
+msesq<-rep(0,length(c))
+for (i in 1:length(c)) {msesq[i]<-sum(((c[i]-1)*mu)^2+c[i]^2*4^2)}
+plot(c,msesq,main='Change of squared MSE with the Change of Shrinkage Parameter')
+```
+
+
+From the plots, we can see that as the shrinkage parameter monotonically increases, the bias decreases and it gets its minimum 0 when c=1; the vaariance monotonically increases and it gets its minimum 0 when c=0. In plot 3, we can see that when the shrinkage parameter is equal to 0.66, the sum of bias square and variance reaches its minimum, which is same as the plot of SE(c).
+
+
+##2.
+
+
+(a) See the attachment.
+
+
+(b) i. See the attachment.
+
+
+ii. In the i, we suppose that the covariates are all 1, thus the regression model is $\hat {E(y)}=\beta^{ridge}=y/(1+\lambda)$, which is same as the shrinakge estimator with $c=1/(1+\lambda)$, thus probabilistic model of y is $y \sim N(\mu,(\sigma)^2）$, which is same as in 1.
+
+
+(c)
+```{r 2(c)1, echo=TRUE}
+n = 100
+x = runif(n)
+y = 3*x + 0.25*rnorm(n)
+A = cbind(rep(1,n), x, 2*x)
+lambda = 1
+beta_ridge = solve(t(A) %*% A + lambda*diag(3), t(A) %*% y)
+y_hat = A %*% beta_ridge
+par(pty="s")
+plot(x, y, col=4, pch=19)
+points(x, y_hat, col=2, pch=19)
+
+lambda = 100
+beta_ridge = solve(t(A) %*% A + lambda*diag(3), t(A) %*% y)
+y_hat = A %*% beta_ridge
+plot(x, y, col=4, pch=19)
+points(x, y_hat, col=2, pch=19)
+lambda = 10000
+beta_ridge = solve(t(A) %*% A + lambda*diag(3), t(A) %*% y)
+y_hat = A %*% beta_ridge
+plot(x, y, col=4, pch=19)
+points(x, y_hat, col=2, pch=19)
+
+
+```
+
+From the plot, we can see that as the lambda increase, the variance of the estimate decreases, but the bias of the estimate increases. 
+
+
+When lambda=1,100, and 10000, the beta_least squares can't be calculated because the system is exactly singular:U[3,3].
+
+
+This is because when we try to solve the beta_least square, the t(A)*A is not full rank due to linear dependent of x and 2x, thus it cannot be inversed, thus we can not get the solution of the linear system. However, for the ridge regression, we added $\lambda I$ to the t(A)A matrix, which lead the matrix become full rank, and can be inversed, thus we can get the solution of the linear system, thus we can compute the beta_ridge.
+
+
+##3.
+(a)
+```{r 3(a), echo=TRUE}
+set.seed(1)
+n=20 #number of samples
+x1 = rnorm(n) # predictor 1 values
+x2 =rnorm(n) # predictor 2 values
+y = 2*x1 + 1*x2+0.25*rnorm(n) # outcome values
+F_lasso = function(b1,b2) { #lasso objective function
+  0.5*sum((y - b1*x1 - b2*x2)^2)/n + lambda*(abs(b1)+abs(b2))}
+
+
+#Perspective plot of F_lasso for a range of lambda values
+betas = seq(-2,3,0.1) #range of coefficient   values for plots
+for (lambda in seq(0,2,0.1)){
+  F_lasso_grid=outer(betas,betas,Vectorize(F_lasso))
+  persp(betas,betas,F_lasso_grid,theta=120,phi=30)
+  Sys.sleep(0.5)
+}
+
+```
+
+
+```{r 3(a)2, echo=TRUE}
+#Contour plot of F_lasso for a range of lambda values
+library("glmnet")
+for (lambda in seq(0,2,0.02)){
+  F_lasso_grid  = outer(betas,betas,Vectorize(F_lasso))
+  contour(betas,betas,F_lasso_grid,nlevels=30)
+  lasso_fit = glmnet(cbind(x1,x2),y,intercept=F,standardize=F,lambda=lambda)
+  points(lasso_fit$beta[1],lasso_fit$beta[2],pch=19,cex=2,col=4)
+  grid()
+  Sys.sleep(0.1)}
+```
+
+
+As we can see from the plot, as the lambda increases, the shape of f_lasso become less smooth with several edges, and the minimum point is firstly close to one axis, then along that axis towards to zero point. 
+
+
+From the plot, we can say that since as the lambda increase, the shape of the F-lasso become less smooth and the low points is firstly moving toward one axis of beta, then along that axis moves towards to zero points, thus, when lambda is higher than a certain level, the minimizer of F-lasso will at one axis of beta, which means that the beta represents by that axis will have exact 0.
+
+
+(2)If we want sparser estimates,we need increase the lambda. Since the minimizer of the F_lasso firstly moving toward one axis of beta, then moving toward another axis of beta along that axis, and so on towards to the zero points as lambda increases, this represent that the estimates will have more betas which is equal to 0 as lambda increases, thus if we need sparser estimates, we need increase the lambda. 
+
+
+(3)When the lambda equal to 0, the least square estimates equal to the minimizer of F_lasso. From the plot, we can see that when lambda equal to 0, the shape of the F_lasso is very smooth, with no striaght change of value; and we can see, along the axises, the value of F_lasso is always higher comparing to the other points. From the countour point, we can see that the minimizer of F_lasso is at the (2,1), which is not on the axis of beta, thus, the least-square estimates doesn't contain exact zeros.
